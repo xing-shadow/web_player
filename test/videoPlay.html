@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>测试页面</title>
+</head>
+
+<body>
+<div>
+    <button onclick="play()">PlayVideo</button>
+    <button onclick="fullScreen()">全屏</button>
+</div>
+<div style="margin-top: 10px">
+    <canvas id="playCanvas" width="1270" height="720"></canvas>
+</div>
+
+<script src="../dist/web_decoder.js"></script>
+<script src="video.js"></script>
+<script src="webgl.js"></script>
+<script src="pcm-player.js"></script>
+<script>
+    let wasmLoaded = -1;
+    Module.onRuntimeInitialized = function() {
+        console.log("wasm加载完成")
+        let videoCallback = Module.addFunction(function (buff, size,weight,height, timestamp) {
+            var outArray = HEAPU8.subarray(buff, buff + size);
+            var data = new Uint8Array(outArray);
+            var objData = {
+                pts: timestamp,
+                data: data,
+                width: weight,
+                height: height,
+            };
+            console.log("接收到视频帧",timestamp)
+            displayVideoFrame(objData);
+        }, 'vpiiij');
+        let audioCallback = Module.addFunction(function (buff, size, timestamp) {
+            var outArray = HEAPU8.subarray(buff, buff + size);
+            var data = new Uint8Array(outArray);
+            var objData = {
+                pts: timestamp,
+                data: data
+            };
+            console.log("接收到音频帧",timestamp)
+            playPcm(objData)
+        }, 'vpij');
+        let ret = Module._openDecoder(videoCallback,audioCallback, LOG_LEVEL_FFMPEG)
+        if (ret === 0) {
+            console.log("openDecoder success");
+        } else {
+            console.error("openDecoder failed with error", ret);
+        }
+        wasmLoaded = 0;
+        return ret;
+    };
+    function play() {
+        const ws = new WebSocket("ws://192.168.111.110:10002/ws/329c905b63104d2caddd28eed3a53996");
+        ws.onopen = () => {
+
+            console.log('WebSocket connection opened')
+        }
+        let frameType, isKey, pts, frameLen, got = 0
+        let frame = null
+        ws.onmessage = async (event) => {
+            const arrayBuffer = await event.data.arrayBuffer()
+            const data = new Uint8Array(arrayBuffer)
+            if (data.byteLength === 14) {
+                //解析头数据
+                let offset = 0
+                const view = new DataView(data.buffer)
+
+                frameType = view.getUint8(offset)
+                offset += 1
+
+                isKey = view.getUint8(offset)
+                offset += 1
+
+                pts = view.getBigUint64(offset, false)
+                offset += 8
+                frameLen = view.getInt32(offset, false)
+                //初始化
+                frame = new Uint8Array(frameLen)
+                got = 0
+            } else {
+                frame.set(data, got)
+                got += data.byteLength
+            }
+            if (got === frameLen) {
+                if (wasmLoaded === 0) {
+                    switch (frameType) {
+                        case 0x01:
+                            DecodeH264Data(frame,pts)
+                            break
+                        case 0x02:
+                            DecodeH265Data(frame,pts)
+                            break
+                        case 0x04:
+                            DecodePcmaData(frame,pts)
+                    }
+                }
+                frameType = 0
+                frameLen = 0
+                frame = null
+                isKey = 0
+                got = 0
+                pts = 0
+            }
+        }
+
+        ws.onerror = (error) => {
+            console.error('WebSocket error:', error)
+        }
+
+        ws.onclose = () => {
+            console.log('WebSocket connection closed')
+        }
+
+    }
+    function fullScreen() {
+        webglPlayer.fullscreen()
+    }
+</script>
+</body>
+</html>

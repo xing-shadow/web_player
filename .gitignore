@@ -1,0 +1,36 @@
+# Created by .ignore support plugin (hsz.mobi)
+# Go binary
+/bin/
+/obj/
+
+# Dependency directories
+/vendor/
+
+# Go build files
+*.test
+*.out
+
+# IDE/Editor directories
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Go-related build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+logs/
+*_linux
+*.tar.gz
+*.h264
+*.h265
+crf_test
+cmake-build-debug
+ffmpeg
