@@ -29,8 +29,6 @@ Thumbs.db
 logs/
 *_linux
 *.tar.gz
-*.h264
-*.h265
 crf_test
 cmake-build-debug
 ffmpeg

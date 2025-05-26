@@ -103,4 +103,7 @@ class Player {
             console.info('WebSocket connection closed')
         }
     }
+    fullscreen() {
+        this.webGLPlayer.fullscreen()
+    }
 }
