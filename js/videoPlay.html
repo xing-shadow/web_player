@@ -19,7 +19,7 @@
 <script src="pcm-player.js"></script>
 <script>
     const canvas = document.getElementById('playCanvas');
-    self.player = new Player('ws://192.168.111.110:10002/ws/43d90e68f2404d3aa2d42a2e0f154bf3',canvas)
+    self.player = new Player('ws://localhost:8080/ws/test',canvas)
     function play() {
         self.player.play()
     }
