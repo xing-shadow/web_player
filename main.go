@@ -181,8 +181,8 @@ func (c *WebSocketConn) Write() {
 		var i int
 		return func() (Frame, error) {
 			if i < pcmaLen {
-				if i+320 < pcmaLen {
-					pts += 8000 / 320 //40ms
+				if i+320 <= pcmaLen {
+					pts += 320 / 8 //40ms
 					frame := Frame{
 						Pts:      pts,
 						isIFrame: false,
@@ -191,7 +191,7 @@ func (c *WebSocketConn) Write() {
 					i += 320
 					return frame, nil
 				} else {
-					pts += 8000 / int64(pcmaLen-i)
+					pts += int64(pcmaLen-i) / 8
 					frame := Frame{
 						Pts:      pts,
 						isIFrame: false,
