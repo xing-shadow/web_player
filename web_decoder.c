@@ -13,7 +13,7 @@
 #include <sys/timeb.h>
 
 typedef void (*VideoCallback)(unsigned char* buff, int size, int weigth, int height, int64_t pts);
-typedef void (*AudioCallback)(unsigned char* buff, int size, unsigned long long pts);
+typedef void (*AudioCallback)(unsigned char* buff, int size, int64_t pts);
 
 #include <libavcodec/avcodec.h>
 
