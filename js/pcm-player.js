@@ -96,6 +96,13 @@ class PCMPlayer {
         bufferSource.start(this.startTime)
         this.startTime += audioBuffer.duration
     }
+    getCurrentTime() {
+        if (this.audioCtx) {
+            return this.audioCtx.currentTime;
+        } else {
+            return 0;
+        }
+    }
     getFormatedValue(data) {
         var data = new this.typedArray(data.buffer),
             float32 = new Float32Array(data.length),

@@ -40,7 +40,7 @@ class Decoder {
         let ret = Module._openDecoder(
             this.videoCallback,
             this.audioCallback,
-            2,
+            1,
         )
         if (ret === 0) {
             console.log('openDecoder success')

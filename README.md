@@ -10,5 +10,4 @@
   go run main.go
 
 ## TODO
-- 音视频同步
 - webcodecs 硬解码

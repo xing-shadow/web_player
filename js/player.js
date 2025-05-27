@@ -8,6 +8,11 @@ class Player {
         this.decodeWorker = null
         this.ws = null
         this.initDecodeWorker()
+        //音视频同步
+        this.audioStartTime = null
+        this.firstAudioPts = null
+        this.videoQueue = [] // 视频帧队列
+        this.syncTimer = null
     }
     initDecodeWorker() {
         this.decodeWorker = new Worker('decoder.js')
@@ -20,7 +25,7 @@ class Player {
         this.decodeWorker.onmessage = (evt) => {
             const objData = evt.data
             if (objData.isVideo) {
-                this.displayVideoFrame(objData)
+                this.videoQueue.push(objData)
             } else {
                 this.displayAudioFrame(objData)
             }
@@ -28,7 +33,6 @@ class Player {
     }
     displayVideoFrame(obj) {
         if (this.webGLPlayer) {
-            console.info('播放视频:' + obj.pts)
             const data = new Uint8Array(obj.data)
             let width = obj.width
             let height = obj.height
@@ -39,7 +43,11 @@ class Player {
     }
     displayAudioFrame(obj) {
         if (this.pcmPlayer) {
-            console.info('播放音频:' + obj.pts)
+            if (!this.audioStartTime) {
+                this.audioStartTime = this.pcmPlayer.getCurrentTime() // eg. AudioContext.currentTime
+                this.firstAudioPts = Number(obj.pts)
+                this.startSyncLoop()
+            }
             this.pcmPlayer.play(obj.data)
         }
     }
@@ -102,6 +110,29 @@ class Player {
         this.ws.onclose = () => {
             console.info('WebSocket connection closed')
         }
+    }
+    startSyncLoop() {
+        this.syncTimer = setInterval(() => {
+            const now = this.pcmPlayer.getCurrentTime()
+            const elapsed = now - this.audioStartTime
+            const currentPts = this.firstAudioPts + elapsed * 1000
+            while (this.videoQueue.length > 0) {
+                const frame = this.videoQueue[0]
+                if (Number(frame.pts) < currentPts - 80) {
+                    // 落后太多，丢掉
+                    console.warn('当前音频时间:', currentPts,'Drop video frame:', frame.pts)
+                    this.videoQueue.shift()
+                } else if (Number(frame.pts) <= currentPts+10) {
+                    console.log('当前音频时间:', currentPts, '视频时间:', frame.pts)
+                    // 在播放窗口内
+                    this.videoQueue.shift()
+                    this.displayVideoFrame(frame)
+                } else {
+                    // 太早了，等一等
+                    break
+                }
+            }
+        }, 10) // 每 10ms 检查一次
     }
     fullscreen() {
         this.webGLPlayer.fullscreen()
