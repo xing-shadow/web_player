@@ -12,6 +12,7 @@ class Player {
         this.audioStartTime = null
         this.firstAudioPts = null
         this.videoQueue = [] // 视频帧队列
+        this.audioQueue = [] //音频帧队列
         this.syncTimer = null
     }
     initDecodeWorker() {
@@ -27,7 +28,12 @@ class Player {
             if (objData.isVideo) {
                 this.videoQueue.push(objData)
             } else {
-                this.displayAudioFrame(objData)
+                if (!this.audioStartTime) {
+                    this.audioStartTime = this.pcmPlayer.getCurrentTime() // eg. AudioContext.currentTime
+                    this.firstAudioPts = Number(objData.pts)
+                    this.startSyncLoop()
+                }
+                this.audioQueue.push(objData)
             }
         }
     }
@@ -43,11 +49,6 @@ class Player {
     }
     displayAudioFrame(obj) {
         if (this.pcmPlayer) {
-            if (!this.audioStartTime) {
-                this.audioStartTime = this.pcmPlayer.getCurrentTime() // eg. AudioContext.currentTime
-                this.firstAudioPts = Number(obj.pts)
-                this.startSyncLoop()
-            }
             this.pcmPlayer.play(obj.data)
         }
     }
@@ -80,8 +81,12 @@ class Player {
                 offset += 8
                 frameLen = view.getUint32(offset, false)
                 //初始化
-                frame = new Uint8Array(frameLen)
-                got = 0
+                try {
+                    frame = new Uint8Array(frameLen)
+                    got = 0
+                }catch (e) {
+                    console.log(e,event)
+                }
             } else {
                 frame.set(data, got)
                 got += data.byteLength
@@ -116,14 +121,14 @@ class Player {
             const now = this.pcmPlayer.getCurrentTime()
             const elapsed = now - this.audioStartTime
             const currentPts = this.firstAudioPts + elapsed * 1000
+            //视频同步
             while (this.videoQueue.length > 0) {
                 const frame = this.videoQueue[0]
                 if (Number(frame.pts) < currentPts - 80) {
                     // 落后太多，丢掉
                     console.warn('当前音频时间:', currentPts,'Drop video frame:', frame.pts)
                     this.videoQueue.shift()
-                } else if (Number(frame.pts) <= currentPts+10) {
-                    console.log('当前音频时间:', currentPts, '视频时间:', frame.pts)
+                } else if (Number(frame.pts) <= currentPts+30) {
                     // 在播放窗口内
                     this.videoQueue.shift()
                     this.displayVideoFrame(frame)
@@ -132,7 +137,26 @@ class Player {
                     break
                 }
             }
+            // 同步播放音频
+            while (this.audioQueue.length > 0) {
+                const audioFrame = this.audioQueue[0]
+                const delta = Number(audioFrame.pts) - currentPts
+                if (delta < -80) {
+                    // 太晚了，丢弃音频帧
+                    console.warn('Drop late audio frame:', audioFrame.pts)
+                    this.audioQueue.shift()
+                } else if (delta <= 30) {
+                    // 时间差在容忍范围内，立刻播放
+                    this.audioQueue.shift()
+                    this.displayAudioFrame(audioFrame)
+                } else {
+                    // 还早，等一等
+                    break
+                }
+            }
         }, 10) // 每 10ms 检查一次
+
+
     }
     fullscreen() {
         this.webGLPlayer.fullscreen()
