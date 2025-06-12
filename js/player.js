@@ -4,7 +4,7 @@ class Player {
         this.playUrl = playUrl
         this.canvas = canvas
         this.pcmPlayer = new PCMPlayer({})
-        this.webGLPlayer = new WebGLPlayer(this.canvas, {})
+        this.webGLPlayer = null
         this.decodeWorker = null
         this.ws = null
         this.initDecodeWorker()
@@ -26,6 +26,9 @@ class Player {
         this.decodeWorker.onmessage = (evt) => {
             const objData = evt.data
             if (objData.isVideo) {
+                if (!this.webGLPlayer) {
+                    this.webGLPlayer = new WebGLPlayer(this.canvas, {format: objData.format})
+                }
                 this.videoQueue.push(objData)
             } else {
                 if (!this.audioStartTime) {
@@ -39,12 +42,9 @@ class Player {
     }
     displayVideoFrame(obj) {
         if (this.webGLPlayer) {
-            const data = new Uint8Array(obj.data)
             let width = obj.width
             let height = obj.height
-            let yLength = width * height
-            let uvLength = (width / 2) * (height / 2)
-            this.webGLPlayer.renderFrame(data, width, height, yLength, uvLength)
+            this.webGLPlayer.renderFrame(obj.data,obj.format, width, height)
         }
     }
     displayAudioFrame(obj) {
@@ -95,6 +95,7 @@ class Player {
                 const objData = {
                     frameType: frameType,
                     frame: frame,
+                    isKey:isKey,
                     pts: pts,
                 }
                 this.decodeWorker.postMessage(objData)
@@ -128,6 +129,9 @@ class Player {
                     // 落后太多，丢掉
                     console.warn('当前音频时间:', currentPts,'Drop video frame:', frame.pts)
                     this.videoQueue.shift()
+                    if (frame.format !== 'I420') {
+                        frame.data.close()
+                    }
                 } else if (Number(frame.pts) <= currentPts+30) {
                     // 在播放窗口内
                     this.videoQueue.shift()

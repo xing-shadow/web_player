@@ -150,7 +150,7 @@ func (c *WebSocketConn) Write() {
 					frame := Frame{
 						Pts:      pts,
 						isIFrame: true,
-						Data:     bytes.Join([][]byte{[]byte{0, 0, 0, 1}, sps, pps, nalus[vIndex]}, []byte{0, 0, 0, 1}),
+						Data:     append([]byte{0, 0, 0, 1}, bytes.Join([][]byte{sps, pps, nalus[vIndex]}, []byte{0, 0, 0, 1})...),
 					}
 					vIndex++
 					return frame, nil

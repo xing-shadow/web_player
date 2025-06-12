@@ -13,6 +13,7 @@ class Decoder {
         this.wasmLoaded = -1
         this.alawDecoder = null
         this.avcDecoder = null
+        this.avcDecoderLoad = false
         this.hevcDecoder = null
         this.audioTimestamp = 0
     }
@@ -43,55 +44,34 @@ class Decoder {
         if (avcCfg) {
             this.avcDecoder = new VideoDecoder({
                 output: async (frame) => {
-                    console.log('接受到视频帧')
-                    // 获取所需缓冲区大小
-                    const size = frame.allocationSize({ format: 'I420' }) // 你也可以使用 'RGBA'
-                    const buffer = new Uint8Array(size)
-
-                    // 复制像素数据到 buffer 中
-                    await frame.copyTo(buffer, { format: 'I420' }).then(()=> {
-                        var objData = {
-                            pts: frame.timestamp,
-                            data: buffer,
-                            width: frame.codedWidth,
-                            height: frame.codedHeight,
-                            isVideo: true,
-                        }
-                        self.postMessage(objData)
-                        frame.close()
-                    }).catch((err) => {
-                        console.error('Error copying h264 frame:', err)
-                        frame.close()
-                    })
-
+                    var objData = {
+                        pts: frame.timestamp,
+                        data: frame,
+                        width: frame.codedWidth,
+                        height: frame.codedHeight,
+                        isVideo: true,
+                        format: frame.format,
+                    }
+                    self.postMessage(objData,[frame])
                 },
                 error: (e) => console.error('VideoDecoder error:', e),
             })
-            this.avcDecoder.configure(avcCfg)
+            await this.avcDecoder.configure(avcCfg)
+            this.avcDecoderLoad =true
         }
         const hevcCfg = await GetHevcConfig()
         if (hevcCfg) {
             this.hevcDecoder = new VideoDecoder({
                 output: async (frame) => {
-                    console.log('接受到视频帧')
-                    // 获取所需缓冲区大小
-                    const size = frame.allocationSize({ format: 'I420' }) // 你也可以使用 'RGBA'
-                    const buffer = new Uint8Array(size)
-                    // 复制像素数据到 buffer 中
-                    frame.copyTo(buffer, { format: 'I420' }).then(()=> {
-                        var objData = {
-                            pts: frame.timestamp,
-                            data: buffer,
-                            width: frame.codedWidth,
-                            height: frame.codedHeight,
-                            isVideo: true,
-                        }
-                        self.postMessage(objData)
-                        frame.close()
-                    }).catch((err) => {
-                        console.error('Error copying h265 frame:', err)
-                        frame.close()
-                    })
+                    var objData = {
+                        pts: frame.timestamp,
+                        data: frame,
+                        width: frame.codedWidth,
+                        height: frame.codedHeight,
+                        isVideo: true,
+                        format: frame.format,
+                    }
+                    self.postMessage(objData,[frame])
                 },
                 error: (e) => console.error('VideoDecoder error:', e),
             })
@@ -100,25 +80,26 @@ class Decoder {
         //初始化软解码器
         this.videoCallback = Module.addFunction(function (buff, size, weight, height, timestamp) {
             var outArray = Module.HEAPU8.subarray(buff, buff + size)
-            var data = new Uint8Array(outArray)
+            var frame = new Uint8Array(outArray)
             var objData = {
                 pts: timestamp,
-                data: data,
+                data: frame,
                 width: weight,
                 height: height,
                 isVideo: true,
+                format:'I420',
             }
-            self.postMessage(objData)
+            self.postMessage(objData,[frame.buffer])
         }, 'vpiiij')
         this.audioCallback = Module.addFunction(function (buff, size, timestamp) {
             var outArray = Module.HEAPU8.subarray(buff, buff + size)
-            var data = new Uint8Array(outArray)
+            var frame = new Uint8Array(outArray)
             var objData = {
                 pts: timestamp,
-                data: data,
+                data: frame,
                 isVideo: false,
             }
-            self.postMessage(objData)
+            self.postMessage(objData,[frame.buffer])
         }, 'vpij')
         let ret = Module._openDecoder(
             this.videoCallback,
@@ -138,7 +119,7 @@ class Decoder {
         if (this.wasmLoaded !== 0) {
             return
         }
-        if (this.avcDecoder) {
+        if (this.avcDecoderLoad) {
             const videoChunk = new EncodedVideoChunk({
                 timestamp: Number(pts),
                 type: isKey === 1 ? 'key' : 'delta',
@@ -400,10 +381,10 @@ async function GetHevcConfig() {
 
 async function GetH264Config() {
     let res
-    res = await CheckH264BaselineDecodeSupport()
+    res = await CheckH264HighDecodeSupport()
     if (res.supported) {
         return {
-            codec: 'avc1.42001E',
+            codec: 'avc1.64001F',
             optimizeForLatency: true,
             hardwareAcceleration: 'prefer-hardware',
         }
@@ -416,10 +397,10 @@ async function GetH264Config() {
             hardwareAcceleration: 'prefer-hardware',
         }
     }
-    res = await CheckH264HighDecodeSupport()
+    res = await CheckH264BaselineDecodeSupport()
     if (res.supported) {
         return {
-            codec: 'avc1.64001F',
+            codec: 'avc1.42001E',
             optimizeForLatency: true,
             hardwareAcceleration: 'prefer-hardware',
         }

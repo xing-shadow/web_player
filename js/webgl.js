@@ -35,8 +35,13 @@ Texture.prototype.fill = function (width, height, data) {
 
 function WebGLPlayer(canvas, options) {
     this.canvas = canvas
-    this.gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
-    this.initGL(options)
+    this.options = options
+    if (options.format === 'I420') {
+        this.gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
+        this.initGL(options)
+    }else {
+        this.ctx= canvas.getContext('2d');
+    }
 }
 
 WebGLPlayer.prototype.initGL = function (options) {
@@ -118,22 +123,28 @@ WebGLPlayer.prototype.initGL = function (options) {
     gl.v.bind(2, program, 'VTexture')
 }
 
-WebGLPlayer.prototype.renderFrame = function (videoFrame, width, height, uOffset, vOffset) {
-    if (!this.gl) {
-        console.log('[ER] Render frame failed due to WebGL not supported.')
-        return
+WebGLPlayer.prototype.renderFrame = function (videoFrame,format, width, height) {
+    if (this.gl && this.options.format === 'I420') {
+        var gl = this.gl
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
+        gl.clearColor(0.0, 0.0, 0.0, 0.0)
+        gl.clear(gl.COLOR_BUFFER_BIT)
+        var yLength = width * height
+        var uLength = (width >> 1) * (height >> 1)
+        gl.y.fill(width, height, videoFrame.subarray(0, yLength))
+        gl.u.fill(width >> 1, height >> 1, videoFrame.subarray(yLength, yLength + uLength))
+        gl.v.fill(width >> 1, height >> 1, videoFrame.subarray(yLength + uLength, videoFrame.length))
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    }else if (this.ctx) {
+        try {
+            this.ctx.drawImage(videoFrame, 0, 0)
+        }catch (e) {
+            console.log("drawImage error",e)
+        }
+        videoFrame.close()
+    }else {
+        console.log('[ER] WebGL not supported.')
     }
-
-    var gl = this.gl
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height)
-    gl.clearColor(0.0, 0.0, 0.0, 0.0)
-    gl.clear(gl.COLOR_BUFFER_BIT)
-
-    gl.y.fill(width, height, videoFrame.subarray(0, uOffset))
-    gl.u.fill(width >> 1, height >> 1, videoFrame.subarray(uOffset, uOffset + vOffset))
-    gl.v.fill(width >> 1, height >> 1, videoFrame.subarray(uOffset + vOffset, videoFrame.length))
-
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
 
 WebGLPlayer.prototype.fullscreen = function () {
