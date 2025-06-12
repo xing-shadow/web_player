@@ -213,7 +213,6 @@ func (c *WebSocketConn) Write() {
 	for !c.stop {
 		select {
 		case <-ticker.C:
-			fmt.Println(1)
 			c.cc.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.cc.WriteMessage(websocket.PingMessage, nil); err != nil {
 				logger.Printf("write ping message error:%v", err)
@@ -228,7 +227,6 @@ func (c *WebSocketConn) Write() {
 				logger.Println("video end")
 				videoEnd = true
 			} else {
-				logger.Println("send video")
 				err = c.sendFrame(0x01, uint64(videoFrame.Pts), videoFrame.isIFrame, videoFrame.Data)
 				if err != nil {
 					c.Stop()
@@ -243,7 +241,6 @@ func (c *WebSocketConn) Write() {
 				logger.Println("audio end")
 				audioEnd = true
 			} else {
-				logger.Println("send audio")
 				err = c.sendFrame(0x04, uint64(audioFrame.Pts), audioFrame.isIFrame, audioFrame.Data)
 				if err != nil {
 					logger.Printf("send audio frame error:%v", err)

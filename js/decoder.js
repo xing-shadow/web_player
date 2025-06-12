@@ -14,6 +14,7 @@ class Decoder {
         this.alawDecoder = null
         this.avcDecoder = null
         this.avcDecoderLoad = false
+        this.hevcDecoderLoad = false
         this.hevcDecoder = null
         this.audioTimestamp = 0
     }
@@ -52,12 +53,12 @@ class Decoder {
                         isVideo: true,
                         format: frame.format,
                     }
-                    self.postMessage(objData,[frame])
+                    self.postMessage(objData, [frame])
                 },
                 error: (e) => console.error('VideoDecoder error:', e),
             })
             await this.avcDecoder.configure(avcCfg)
-            this.avcDecoderLoad =true
+            this.avcDecoderLoad = true
         }
         const hevcCfg = await GetHevcConfig()
         if (hevcCfg) {
@@ -71,11 +72,12 @@ class Decoder {
                         isVideo: true,
                         format: frame.format,
                     }
-                    self.postMessage(objData,[frame])
+                    self.postMessage(objData, [frame])
                 },
                 error: (e) => console.error('VideoDecoder error:', e),
             })
             this.hevcDecoder.configure(hevcCfg)
+            this.hevcDecoderLoad = true
         }
         //初始化软解码器
         this.videoCallback = Module.addFunction(function (buff, size, weight, height, timestamp) {
@@ -87,9 +89,9 @@ class Decoder {
                 width: weight,
                 height: height,
                 isVideo: true,
-                format:'I420',
+                format: 'I420',
             }
-            self.postMessage(objData,[frame.buffer])
+            self.postMessage(objData, [frame.buffer])
         }, 'vpiiij')
         this.audioCallback = Module.addFunction(function (buff, size, timestamp) {
             var outArray = Module.HEAPU8.subarray(buff, buff + size)
@@ -99,7 +101,7 @@ class Decoder {
                 data: frame,
                 isVideo: false,
             }
-            self.postMessage(objData,[frame.buffer])
+            self.postMessage(objData, [frame.buffer])
         }, 'vpij')
         let ret = Module._openDecoder(
             this.videoCallback,
@@ -115,7 +117,8 @@ class Decoder {
         this.wasmLoaded = 0
         console.info('wasm loaded')
     }
-    decodeH264Data(data, pts,isKey) {
+
+    decodeH264Data(data, pts, isKey) {
         if (this.wasmLoaded !== 0) {
             return
         }
@@ -141,11 +144,12 @@ class Decoder {
             cacheBuffer = null
         }
     }
-    decodeH265Data(data, pts,isKey) {
+
+    decodeH265Data(data, pts, isKey) {
         if (this.wasmLoaded !== 0) {
             return
         }
-        if (this.hevcDecoder) {
+        if (this.hevcDecoderLoad) {
             const videoChunk = new EncodedVideoChunk({
                 timestamp: Number(pts),
                 type: isKey === 1 ? 'key' : 'delta',
@@ -168,6 +172,7 @@ class Decoder {
             cacheBuffer = null
         }
     }
+
     decodePcmaData(data, pts) {
         if (this.wasmLoaded !== 0) {
             return
@@ -206,10 +211,10 @@ self.onmessage = function (evt) {
     const objData = evt.data
     switch (objData.frameType) {
         case 0x01:
-            self.decoder.decodeH264Data(objData.frame, objData.pts,objData.isKey)
+            self.decoder.decodeH264Data(objData.frame, objData.pts, objData.isKey)
             break
         case 0x02:
-            self.decoder.decodeH265Data(objData.frame, objData.pts,objData.isKey)
+            self.decoder.decodeH265Data(objData.frame, objData.pts, objData.isKey)
             break
         case 0x04:
             self.decoder.decodePcmaData(objData.frame, objData.pts)
