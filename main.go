@@ -234,22 +234,24 @@ func (c *WebSocketConn) Write() {
 					break
 				}
 			}
-		}
-		if !audioEnd {
-			audioFrame, err := getAudioFrame()
-			if err != nil {
-				logger.Println("audio end")
-				audioEnd = true
-			} else {
-				err = c.sendFrame(0x04, uint64(audioFrame.Pts), audioFrame.isIFrame, audioFrame.Data)
+			if !audioEnd {
+				audioFrame, err := getAudioFrame()
 				if err != nil {
-					logger.Printf("send audio frame error:%v", err)
-					c.Stop()
-					break
+					logger.Println("audio end")
+					audioEnd = true
+				} else {
+					err = c.sendFrame(0x04, uint64(audioFrame.Pts), audioFrame.isIFrame, audioFrame.Data)
+					if err != nil {
+						logger.Printf("send audio frame error:%v", err)
+						c.Stop()
+						break
+					}
 				}
 			}
+			time.Sleep(time.Millisecond * 40)
 		}
-		if audioEnd && videoEnd {
+
+		if videoEnd {
 			c.Stop()
 			break
 		}

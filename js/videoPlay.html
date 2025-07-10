@@ -3,15 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <title>测试页面</title>
+    <style>
+        #videoPlayer {
+            width: 1280px;
+            height: 720px;
+            background-color: white;
+            border: 2px solid rgba(0, 0, 0, 0.9);
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%,-50%);
+            z-index: 10;
+        }
+        .control-btn {
+            position: absolute;
+            width: 48px;
+            height: 48px;
+            left: 20px;
+            bottom: 10px;
+            cursor: pointer;
+            z-index: 20;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+    </style>
 </head>
 
 <body>
-<div>
-    <button onclick="play()">PlayVideo</button>
-    <button onclick="fullScreen()">全屏</button>
-</div>
-<div style="margin-top: 10px">
-    <canvas id="playCanvas" width="1280" height="720"></canvas>
+<div id="videoPlayer">
+    <div>
+        <canvas id="playCanvas" width="1280" height="720" ></canvas>
+        <img id="playIcon" class="control-btn" src="img/play.png" alt="播放图标" onclick="playVideo()">
+    </div>
 </div>
 
 <script src="webgl.js"></script>
@@ -20,11 +43,19 @@
 <script>
     const canvas = document.getElementById('playCanvas');
     self.player = new Player('ws://localhost:8080/ws/test',canvas)
-    function play() {
-        self.player.play()
-    }
-    function fullScreen() {
-        self.player.fullscreen()
+    let el = document.getElementById("playIcon");
+    function playVideo() {
+        const currentState = self.player.getState();
+        if (currentState === playerStatePlaying) {
+            el.src = "img/play.png";
+        } else {
+            el.src = "img/pause.png";
+        }
+        if (currentState !== playerStatePlaying) {
+            self.player.play()
+        }else {
+            self.player.pause();
+        }
     }
 </script>
 </body>

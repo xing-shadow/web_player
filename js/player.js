@@ -1,3 +1,5 @@
+const playerStatePlaying        = 1;
+const playerStatePausing        = 2;
 
 class Player {
     constructor(playUrl, canvas) {
@@ -14,6 +16,7 @@ class Player {
         this.videoQueue = [] // 视频帧队列
         this.audioQueue = [] //音频帧队列
         this.syncTimer = null
+        this.playerState = playerStatePausing
     }
     initDecodeWorker() {
         this.decodeWorker = new Worker('decoder.js')
@@ -42,6 +45,9 @@ class Player {
     }
     displayVideoFrame(obj) {
         if (this.webGLPlayer) {
+            if (this.playerState !== playerStatePlaying) {
+                return false;
+            }
             let width = obj.width
             let height = obj.height
             this.webGLPlayer.renderFrame(obj.data,obj.format, width, height)
@@ -52,7 +58,19 @@ class Player {
             this.pcmPlayer.play(obj.data)
         }
     }
+    getState() {
+        return this.playerState;
+    }
     play() {
+        if (this.playerState === playerStatePlaying ) {
+            return
+        }else {
+            this.pcmPlayer.volume(1);
+            this.playerState = playerStatePlaying
+        }
+        if (this.ws != null) {
+            return
+        }
         this.ws = new WebSocket(this.playUrl)
         this.ws.onopen = () => {
             console.info('WebSocket connection opened')
@@ -114,7 +132,18 @@ class Player {
         }
 
         this.ws.onclose = () => {
+            this.ws = null
             console.info('WebSocket connection closed')
+        }
+    }
+    pause() {
+        if (this.playerState === playerStatePausing) {
+            return
+        }else {
+            this.playerState = playerStatePausing
+        }
+        if (this.pcmPlayer) {
+            this.pcmPlayer.volume(0);
         }
     }
     startSyncLoop() {
